@@ -1,0 +1,100 @@
+@baseUrl = http://localhost:5000
+
+### 1. Health Check
+GET {{baseUrl}}/
+Accept: application/json
+
+### 2. Developer Dashboard (Overview of Tasks, Outbox, Delegations)
+GET {{baseUrl}}/api/v1/dev/dashboard
+Accept: application/json
+
+### 3. Start Workflow - Permohonan Capex Asset (Draft)
+POST {{baseUrl}}/api/v1/workflow/start
+Content-Type: application/json
+X-User-Id: 1
+X-User-Name: Budi Santoso
+
+{
+  "tipeDisposisi": 201,
+  "idForm": 501
+}
+
+### 4. Submit Capex to Supervisor (Step 1 -> Waiting Supervisor)
+POST {{baseUrl}}/api/v1/workflow/next
+Content-Type: application/json
+X-User-Id: 1
+X-User-Name: Budi Santoso
+
+{
+  "idTask": 0,
+  "idUrutanDisposisi": 1,
+  "idDokumen": "CPX-2026-0001",
+  "noDokumen": "DOC/CPX/2026/X/001",
+  "idForm": 501,
+  "selectedApproverId": 2,
+  "catatanDisposisi": "Pengajuan pengadaan server cloud enterprise cluster",
+  "documentAmount": 150000000
+}
+
+### 5. Get Task Detail (Approver / Viewer View)
+# Ganti idTask dengan ID yang dikembalikan dari step 4
+POST {{baseUrl}}/api/v1/workflow/get
+Content-Type: application/json
+X-User-Id: 2
+X-User-Name: Siti Rahmawati
+
+{
+  "idTask": 1
+}
+
+### 6. Supervisor Approves & Escalates to Finance Director (Step 2)
+POST {{baseUrl}}/api/v1/workflow/next
+Content-Type: application/json
+X-User-Id: 2
+X-User-Name: Siti Rahmawati
+
+{
+  "idTask": 1,
+  "idUrutanDisposisi": 2,
+  "idDokumen": "CPX-2026-0001",
+  "noDokumen": "DOC/CPX/2026/X/001",
+  "idForm": 501,
+  "selectedApproverId": 5,
+  "catatanDisposisi": "Disetujui. Telah sesuai dengan alokasi budget Q4.",
+  "documentAmount": 150000000
+}
+
+### 7. Finance Director Final Approval (Step 4 -> Completed)
+POST {{baseUrl}}/api/v1/workflow/next
+Content-Type: application/json
+X-User-Id: 5
+X-User-Name: Agus Salim
+
+{
+  "idTask": 1,
+  "idUrutanDisposisi": 4,
+  "idDokumen": "CPX-2026-0001",
+  "noDokumen": "DOC/CPX/2026/X/001",
+  "idForm": 501,
+  "catatanDisposisi": "Approved final. Lakukan penerbitan PO.",
+  "documentAmount": 150000000
+}
+
+### 8. Pendaftaran Delegasi Wewenang (Cuti / Plt / Pjs)
+POST {{baseUrl}}/api/v1/workflow/delegations
+Content-Type: application/json
+X-User-Id: 2
+X-User-Name: Siti Rahmawati
+
+{
+  "idUserPenerima": 6,
+  "idTipeDisposisi": null,
+  "tanggalMulai": "2026-10-18T00:00:00Z",
+  "tanggalSelesai": "2026-10-31T23:59:59Z",
+  "alasanDelegasi": "Cuti Tahunan & Perjalanan Dinas Luar Kota"
+}
+
+### 9. Cek Delegasi Aktif Saya
+GET {{baseUrl}}/api/v1/workflow/delegations/my-active
+X-User-Id: 2
+Accept: application/json
