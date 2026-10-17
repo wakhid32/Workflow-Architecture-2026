@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using UserManagement.Api.Extensions;
+using UserManagement.Infrastructure.Persistence;
 using WorkflowEngine.Application;
 using WorkflowEngine.Infrastructure;
 using WorkflowEngine.Infrastructure.Hubs;
@@ -12,17 +14,20 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
-// 2. Web API Controllers with Global Exception Filter
+// 2. Register UserManagement Module (Keycloak IdP, Security DB, Redis Cache, Polly, Rate Limiter)
+builder.Services.AddUserManagementModule(builder.Configuration);
+
+// 3. Web API Controllers with Global Exception Filter
 builder.Services.AddScoped<ApiExceptionFilterAttribute>();
 builder.Services.AddControllers(options =>
 {
     options.Filters.Add<ApiExceptionFilterAttribute>();
 });
 
-// 3. OpenAPI Specification
+// 4. OpenAPI Specification
 builder.Services.AddOpenApi();
 
-// 4. CORS Policy for Angular SPA & Modern Web Clients
+// 5. CORS Policy for Angular SPA & Modern Web Clients
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("WorkflowCorsPolicy", policy =>
@@ -36,7 +41,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// 5. Database Initialization & Seed Master Data on Startup
+// 6. Database Initialization & Seed Master Data on Startup
 using (var scope = app.Services.CreateScope())
 {
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
@@ -51,22 +56,58 @@ using (var scope = app.Services.CreateScope())
         }
         else
         {
-            logger.LogInformation("Ensuring database schema exists...");
+            logger.LogInformation("Ensuring workflow database schema exists...");
             await dbContext.Database.EnsureCreatedAsync();
         }
 
         logger.LogInformation("Seeding default workflow master configurations...");
         await WorkflowDbContextSeed.SeedDefaultWorkflowsAsync(dbContext);
 
-        logger.LogInformation("Database ready and verified.");
+        logger.LogInformation("Workflow database ready and verified.");
     }
     catch (Exception ex)
     {
-        logger.LogWarning(ex, "Could not initialize primary database provider ({Provider}). Verify connection string or start PostgreSQL container.", dbContext.Database.ProviderName);
+        logger.LogWarning(ex, "Could not initialize primary workflow database provider ({Provider}). Verify connection string or start PostgreSQL container.", dbContext.Database.ProviderName);
+    }
+
+    // Initialize Security Identity Database (security_identity_db: M_STAF & SEC_AUDIT_LOG)
+    var securityDbContext = scope.ServiceProvider.GetService<UserManagementDbContext>();
+    if (securityDbContext != null)
+    {
+        try
+        {
+            if (securityDbContext.Database.IsRelational())
+            {
+                logger.LogInformation("Applying security database migrations ({Provider})...", securityDbContext.Database.ProviderName);
+                await securityDbContext.Database.MigrateAsync();
+            }
+            else
+            {
+                logger.LogInformation("Ensuring security database schema exists...");
+                await securityDbContext.Database.EnsureCreatedAsync();
+            }
+
+            logger.LogInformation("Security database ready and verified.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not initialize security database provider ({Provider}).", securityDbContext.Database.ProviderName);
+        }
     }
 }
 
-// 6. Request Pipeline Configuration (OpenAPI & Swagger UI)
+// 7. Security Middlewares (OWASP Headers, Correlation ID, Rate Limiting, JWT Auth & Revocation)
+app.UseSecurityHeaders();
+app.UseCorrelationId();
+
+app.UseCors("WorkflowCorsPolicy");
+
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseTokenRevocation();
+app.UseAuthorization();
+
+// 8. Request Pipeline Configuration (OpenAPI & Swagger UI)
 app.MapOpenApi();
 
 app.UseSwaggerUI(options =>
@@ -75,8 +116,6 @@ app.UseSwaggerUI(options =>
     options.RoutePrefix = "swagger";
     options.DocumentTitle = "Workflow Engine Swagger UI";
 });
-
-app.UseCors("WorkflowCorsPolicy");
 
 app.UseRouting();
 

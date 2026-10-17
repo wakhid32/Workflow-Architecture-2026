@@ -4,6 +4,7 @@
     <ProjectReference Include="..\WorkflowEngine.Domain\WorkflowEngine.Domain.csproj" />
     <ProjectReference Include="..\WorkflowEngine.Application\WorkflowEngine.Application.csproj" />
     <ProjectReference Include="..\WorkflowEngine.Infrastructure\WorkflowEngine.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\UserManagement\UserManagement.Api\UserManagement.Api.csproj" />
   </ItemGroup>
 
   <ItemGroup>

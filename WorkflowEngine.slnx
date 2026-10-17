@@ -5,7 +5,14 @@
     <Project Path="src/WorkflowEngine.Infrastructure/WorkflowEngine.Infrastructure.csproj" />
     <Project Path="src/WorkflowEngine.WebApi/WorkflowEngine.WebApi.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/UserManagement/">
+    <Project Path="src/Modules/UserManagement/UserManagement.Domain/UserManagement.Domain.csproj" />
+    <Project Path="src/Modules/UserManagement/UserManagement.Application/UserManagement.Application.csproj" />
+    <Project Path="src/Modules/UserManagement/UserManagement.Infrastructure/UserManagement.Infrastructure.csproj" />
+    <Project Path="src/Modules/UserManagement/UserManagement.Api/UserManagement.Api.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/WorkflowEngine.Tests/WorkflowEngine.Tests.csproj" />
   </Folder>
 </Solution>
+
