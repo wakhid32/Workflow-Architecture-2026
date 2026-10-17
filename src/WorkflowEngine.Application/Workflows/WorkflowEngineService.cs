@@ -323,8 +323,23 @@ public sealed class WorkflowEngineService : IWorkflowEngineService
         WtTasklist task;
         long? createdHistId = null;
 
-        // SKENARIO A: INISIASI DOKUMEN BARU (DRAFT -> SUBMIT)
-        if (!request.IdTask.HasValue || request.IdTask.Value == 0)
+        // Cari task yang sudah ada berdasarkan IdTask atau HashId
+        WtTasklist? existingTask = null;
+        if (request.IdTask.HasValue && request.IdTask.Value > 0)
+        {
+            existingTask = await _context.WtTasklist
+                .Include(t => t.Assignees)
+                .FirstOrDefaultAsync(t => t.IdTask == request.IdTask.Value, ct);
+        }
+        else if (!string.IsNullOrWhiteSpace(request.HashId) && request.HashId != "string")
+        {
+            existingTask = await _context.WtTasklist
+                .Include(t => t.Assignees)
+                .FirstOrDefaultAsync(t => t.HashId == request.HashId, ct);
+        }
+
+        // SKENARIO A: INISIASI DOKUMEN BARU (DRAFT -> SUBMIT PERTAMA KALI)
+        if (existingTask == null)
         {
             task = new WtTasklist
             {
@@ -396,10 +411,7 @@ public sealed class WorkflowEngineService : IWorkflowEngineService
         // SKENARIO B: TRANSISI DOKUMEN AKTIF (EXISTING TASK)
         else
         {
-            task = await _context.WtTasklist
-                .Include(t => t.Assignees)
-                .FirstOrDefaultAsync(t => t.IdTask == request.IdTask.Value, ct)
-                ?? throw new NotFoundException(nameof(WtTasklist), request.IdTask.Value);
+            task = existingTask;
 
             // Validasi Hak Akses Eksekutor (Langsung, Assignee, atau Delegasi)
             bool isDirectPic = task.IdUserTujuan == currentUserId;
@@ -675,5 +687,143 @@ public sealed class WorkflowEngineService : IWorkflowEngineService
 
         delegation.IsActive = false;
         await _context.SaveChangesAsync(ct);
+    }
+
+    // ==========================================
+    // INBOX & MY TASKS IMPLEMENTATION
+    // ==========================================
+
+    public async Task<List<WorkflowInboxItemDto>> GetMyInboxTasksAsync(GetInboxTasksRequest? request = null, CancellationToken ct = default)
+    {
+        var targetUserId = request?.UserId ?? _currentUser.UserId;
+        var now = DateTime.UtcNow;
+
+        // 1. Ambil seluruh delegasi aktif yang diberikan kepada user ini (Plt)
+        var activeDelegations = await _context.WmWorkflowDelegation
+            .AsNoTracking()
+            .Where(d => d.IdUserPenerima == targetUserId
+                     && d.IsActive
+                     && d.TanggalMulai <= now
+                     && d.TanggalSelesai >= now)
+            .ToListAsync(ct);
+
+        var delegatedPemberiIds = activeDelegations.Select(d => d.IdUserPemberi).Distinct().ToList();
+
+        // 2. Query task aktif yang membutuhkan aksi persetujuan
+        var query = _context.WtTasklist
+            .Include(t => t.TipeDisposisi)
+            .Include(t => t.Assignees)
+            .AsNoTracking()
+            .Where(t => t.ApprovalStatus == ApprovalStatus.InProgress && t.TglDispAkhir == null);
+
+        if (request?.IdTipeDisposisi.HasValue == true)
+        {
+            query = query.Where(t => t.IdTipeDisposisi == request.IdTipeDisposisi.Value);
+        }
+
+        if (request?.IsOverdue.HasValue == true)
+        {
+            query = query.Where(t => t.IsOverdue == request.IsOverdue.Value);
+        }
+
+        var candidateTasks = await query
+            .OrderByDescending(t => t.IsOverdue)
+            .ThenBy(t => t.DueDate)
+            .ThenByDescending(t => t.TglDispMulai)
+            .ToListAsync(ct);
+
+        // 3. Evaluasi apakah task relevan bagi user (Direct PIC, Multi-Assignee, atau Delegasi Plt)
+        var resultList = new List<WorkflowInboxItemDto>();
+        var page = request?.Page ?? 1;
+        var pageSize = request?.PageSize ?? 20;
+
+        foreach (var task in candidateTasks)
+        {
+            bool isDirectPic = task.IdUserTujuan == targetUserId;
+            bool isAssignee = task.Assignees.Any(a => a.IdUser == targetUserId && a.StatusApproval == AssigneeApprovalStatus.Pending);
+            
+            // Cek apakah ada delegasi wewenang yang meng-cover tipe disposisi task ini
+            var matchingDelegation = activeDelegations.FirstOrDefault(d =>
+                d.IdUserPemberi == task.IdUserTujuan &&
+                (!d.IdTipeDisposisi.HasValue || d.IdTipeDisposisi.Value == task.IdTipeDisposisi));
+
+            bool isDelegated = matchingDelegation != null;
+
+            if (isDirectPic || isAssignee || isDelegated)
+            {
+                // Hitung tombol aksi yang tersedia pada langkah ini
+                var actionsCount = await _context.WmUrutanDisposisi
+                    .AsNoTracking()
+                    .CountAsync(u => u.IdTipeDisposisi == task.IdTipeDisposisi
+                                  && u.IdStatusDokAsal == task.IdStatusDok
+                                  && u.IsActive, ct);
+
+                resultList.Add(new WorkflowInboxItemDto(
+                    IdTask: task.IdTask,
+                    HashId: task.HashId,
+                    IdDokumen: task.IdDokumen,
+                    NoDokumen: task.NoDokumen,
+                    IdTipeDisposisi: task.IdTipeDisposisi,
+                    NamaTipeDisposisi: task.TipeDisposisi?.NamaDisposisi ?? $"Tipe {task.IdTipeDisposisi}",
+                    KodeModul: task.TipeDisposisi?.KodeModul ?? "UNKNOWN",
+                    IdStatusDok: task.IdStatusDok,
+                    ApprovalStatus: task.ApprovalStatus.ToString(),
+                    Priority: task.Priority.ToString(),
+                    IdUserAsal: task.IdUserAsal,
+                    NamaUserAsal: $"User #{task.IdUserAsal}",
+                    TglDispMulai: task.TglDispMulai,
+                    DueDate: task.DueDate,
+                    SlaHours: task.SlaHours,
+                    IsOverdue: task.IsOverdue,
+                    IsDelegated: isDelegated,
+                    DelegatedFromUserName: isDelegated ? $"User #{matchingDelegation!.IdUserPemberi}" : null,
+                    AvailableActionsCount: actionsCount,
+                    RowVersion: task.RowVersion
+                ));
+            }
+        }
+
+        return resultList
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+    }
+
+    public async Task<List<WorkflowSubmissionItemDto>> GetMySubmissionsAsync(long? userId = null, int? idTipeDisposisi = null, CancellationToken ct = default)
+    {
+        var targetUserId = userId ?? _currentUser.UserId;
+
+        var query = _context.WtTasklist
+            .Include(t => t.TipeDisposisi)
+            .AsNoTracking()
+            .Where(t => t.IdUserAsal == targetUserId);
+
+        if (idTipeDisposisi.HasValue)
+        {
+            query = query.Where(t => t.IdTipeDisposisi == idTipeDisposisi.Value);
+        }
+
+        var tasks = await query
+            .OrderByDescending(t => t.CreatedDate)
+            .Take(50)
+            .ToListAsync(ct);
+
+        return tasks.Select(t => new WorkflowSubmissionItemDto(
+            IdTask: t.IdTask,
+            HashId: t.HashId,
+            IdDokumen: t.IdDokumen,
+            NoDokumen: t.NoDokumen,
+            IdTipeDisposisi: t.IdTipeDisposisi,
+            NamaTipeDisposisi: t.TipeDisposisi?.NamaDisposisi ?? $"Tipe {t.IdTipeDisposisi}",
+            KodeModul: t.TipeDisposisi?.KodeModul ?? "UNKNOWN",
+            IdStatusDok: t.IdStatusDok,
+            ApprovalStatus: t.ApprovalStatus.ToString(),
+            Priority: t.Priority.ToString(),
+            CurrentPicUserId: t.IdUserTujuan,
+            CurrentPicUserName: $"User #{t.IdUserTujuan}",
+            CreatedDate: t.CreatedDate,
+            DueDate: t.DueDate,
+            IsOverdue: t.IsOverdue
+        )).ToList();
     }
 }

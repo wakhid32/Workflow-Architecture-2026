@@ -16,4 +16,7 @@ public interface IWorkflowEngineService
     Task<DelegationResponseDto> CreateDelegationAsync(CreateDelegationRequest request, CancellationToken ct = default);
     Task<List<DelegationResponseDto>> GetMyActiveDelegationsAsync(CancellationToken ct = default);
     Task RevokeDelegationAsync(long idDelegation, CancellationToken ct = default);
+
+    Task<List<WorkflowInboxItemDto>> GetMyInboxTasksAsync(GetInboxTasksRequest? request = null, CancellationToken ct = default);
+    Task<List<WorkflowSubmissionItemDto>> GetMySubmissionsAsync(long? userId = null, int? idTipeDisposisi = null, CancellationToken ct = default);
 }

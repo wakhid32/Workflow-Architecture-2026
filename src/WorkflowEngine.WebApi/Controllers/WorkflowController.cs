@@ -32,6 +32,39 @@ public sealed class WorkflowController : ControllerBase
     }
 
     /// <summary>
+    /// Mengambil daftar task workflow yang sedang menunggu persetujuan/tindakan dari user yang aktif (Inbox / To-Do List).
+    /// Otomatis mengevaluasi direct PIC, multi-assignee, dan pelimpahan wewenang cuti (Plt).
+    /// </summary>
+    [HttpGet("inbox")]
+    [ProducesResponseType(typeof(List<WorkflowInboxItemDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetInbox(
+        [FromQuery] long? userId,
+        [FromQuery] int? idTipeDisposisi,
+        [FromQuery] bool? isOverdue,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken ct = default)
+    {
+        var request = new GetInboxTasksRequest(userId, idTipeDisposisi, isOverdue, page, pageSize);
+        var result = await _workflowEngine.GetMyInboxTasksAsync(request, ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Mengambil daftar dokumen yang pernah diajukan oleh user (My Submissions / Outbox pelacakan status).
+    /// </summary>
+    [HttpGet("submissions")]
+    [ProducesResponseType(typeof(List<WorkflowSubmissionItemDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetSubmissions(
+        [FromQuery] long? userId,
+        [FromQuery] int? idTipeDisposisi,
+        CancellationToken ct = default)
+    {
+        var result = await _workflowEngine.GetMySubmissionsAsync(userId, idTipeDisposisi, ct);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Mengambil detail status task berjalan, histori disposisi, token konkurensi, dan tombol aksi yang diizinkan untuk active user.
     /// </summary>
     /// <param name="request">Kueri pencarian task (IdTask, HashId, atau IdDokumen + IdTipeDisposisi).</param>

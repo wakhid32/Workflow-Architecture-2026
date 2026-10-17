@@ -218,3 +218,56 @@ public record DelegationResponseDto(
     bool IsActive,
     DateTime CreatedDate
 );
+
+// ==========================================
+// INBOX & SUBMISSION DTOs (MY TASKS)
+// ==========================================
+
+public record WorkflowInboxItemDto(
+    long IdTask,
+    string HashId,
+    string IdDokumen,
+    string NoDokumen,
+    int IdTipeDisposisi,
+    string NamaTipeDisposisi,
+    string KodeModul,
+    string IdStatusDok,
+    string ApprovalStatus,
+    string Priority,
+    long IdUserAsal,
+    string NamaUserAsal,
+    DateTime TglDispMulai,
+    DateTime? DueDate,
+    int? SlaHours,
+    bool IsOverdue,
+    bool IsDelegated,
+    string? DelegatedFromUserName,
+    int AvailableActionsCount,
+    byte[] RowVersion
+);
+
+public record WorkflowSubmissionItemDto(
+    long IdTask,
+    string HashId,
+    string IdDokumen,
+    string NoDokumen,
+    int IdTipeDisposisi,
+    string NamaTipeDisposisi,
+    string KodeModul,
+    string IdStatusDok,
+    string ApprovalStatus,
+    string Priority,
+    long CurrentPicUserId,
+    string CurrentPicUserName,
+    DateTime CreatedDate,
+    DateTime? DueDate,
+    bool IsOverdue
+);
+
+public record GetInboxTasksRequest(
+    long? UserId = null,
+    int? IdTipeDisposisi = null,
+    bool? IsOverdue = null,
+    int Page = 1,
+    int PageSize = 20
+);

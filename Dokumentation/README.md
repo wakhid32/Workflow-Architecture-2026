@@ -195,37 +195,57 @@ Aplikasi akan secara otomatis membuat dan menyemai database di dalam memori RAM 
 
 ## 🏃 Cara Menjalankan Aplikasi
 
-1. **Restore dependensi dan kompilasi project**:
-   ```powershell
-   dotnet build
-   ```
-2. **Jalankan service Web API**:
-   ```powershell
-   dotnet run --project src/WorkflowEngine.WebApi/WorkflowEngine.WebApi.csproj
-   ```
-3. **Output di terminal akan mengonfirmasi port yang aktif**:
-   ```text
-   info: Microsoft.Hosting.Lifetime[14]
-         Now listening on: http://localhost:5000
-   info: Microsoft.Hosting.Lifetime[14]
-         Now listening on: http://localhost:5241
-   info: Microsoft.Hosting.Lifetime[0]
-         Application started. Press Ctrl+C to shut down.
-   ```
-4. **Verifikasi server berjalan dengan mengakses endpoint root**:
-   ```powershell
-   curl http://localhost:5000/
-   ```
-   Response JSON:
-   ```json
-   {
-     "application": "Enterprise Workflow Engine API (.NET Core 10 LTS)",
-     "status": "Healthy",
-     "version": "2.1.0",
-     "swaggerUI": "/swagger",
-     "openApiSchema": "/openapi/v1.json"
-   }
-   ```
+Pastikan container database PostgreSQL telah berjalan terlebih dahulu:
+```powershell
+docker compose up -d
+```
+
+Pilih salah satu dari 2 mode berikut untuk menjalankan Web API:
+
+### Mode 1: Development dengan Auto Hot Reload (Sangat Direkomendasikan 🔥)
+Gunakan `dotnet watch` agar setiap kali Anda mengedit kode C# atau file konfigurasi JSON lalu menyimpannya (`Ctrl + S`), aplikasi akan secara otomatis mengompilasi ulang dan menerapkan perubahan secara instan **tanpa perlu mematikan dan me-restart server secara manual**!
+
+Jalankan perintah ini dari root folder proyek:
+```powershell
+dotnet watch --project src/WorkflowEngine.WebApi/WorkflowEngine.WebApi.csproj
+```
+> 💡 **Penting**: Flag `--project src/WorkflowEngine.WebApi/WorkflowEngine.WebApi.csproj` **wajib disertakan** saat berada di root folder agar .NET mengetahui secara spesifik proyek utama mana yang ingin dijalankan, atau Anda dapat masuk ke foldernya terlebih dahulu (`cd src/WorkflowEngine.WebApi` lalu `dotnet watch`).
+
+---
+
+### Mode 2: Standar Run (Single Execution)
+Jika Anda hanya ingin menjalankan aplikasi satu kali jalan tanpa file watcher:
+```powershell
+dotnet run --project src/WorkflowEngine.WebApi/WorkflowEngine.WebApi.csproj
+```
+
+---
+
+### Output Terminal & Konfirmasi Port Aktif
+Saat aplikasi berhasil dijalankan, terminal akan mengonfirmasi port yang terbuka:
+```text
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5000
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5241
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+```
+
+Verifikasi server berjalan dengan mengakses endpoint root:
+```powershell
+curl http://localhost:5000/
+```
+Response JSON:
+```json
+{
+  "application": "Enterprise Workflow Engine API (.NET Core 10 LTS)",
+  "status": "Healthy",
+  "version": "2.1.0",
+  "swaggerUI": "/swagger",
+  "openApiSchema": "/openapi/v1.json"
+}
+```
 
 ---
 
