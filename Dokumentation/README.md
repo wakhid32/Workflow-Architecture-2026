@@ -519,6 +519,7 @@ Tunggu 60 detik hingga sliding window rate limit reset kembali.
 
 ---
 
-## 📄 Lisensi & Standar Rekayasa
-Dikembangkan untuk kebutuhan arsitektur alur kerja enterprise perbankan dan korporasi modern berbasis **.NET 10 LTS**, **PostgreSQL**, **Redis**, dan **Keycloak**.
-Didokumentasikan dan diverifikasi dengan standar industri oleh **Antigravity Prime Architecture Engine**.
+### Lisensi & Standar Rekayasa
+Dikembangkan untuk kebutuhan arsitektur alur kerja enterprise perbankan dan korporasi modern berbasis .NET Core/.NET 8/10, PostgreSQL, Redis, dan Keycloak. Didokumentasikan dan diverifikasi secara mandiri untuk standar enterprise.
+
+* **Hak Cipta / Copyright:** © 2026 [Wakhid Abi Fakhih]. Hak cipta dilindungi undang-undang.
